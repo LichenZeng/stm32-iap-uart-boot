@@ -62,28 +62,28 @@ void STM_EVAL_COMInit(USART_InitTypeDef* USART_InitStruct)
   GPIO_InitTypeDef GPIO_InitStructure;
 
   /* Enable GPIO clock */
-  RCC_APB2PeriphClockCmd(EVAL_COM1_TX_GPIO_CLK | EVAL_COM1_RX_GPIO_CLK | RCC_APB2Periph_AFIO, ENABLE);
+  RCC_APB2PeriphClockCmd(EVAL_COM2_TX_GPIO_CLK | EVAL_COM2_RX_GPIO_CLK | RCC_APB2Periph_AFIO, ENABLE);
 
   /* Enable UART clock */
-  RCC_APB2PeriphClockCmd(EVAL_COM1_CLK, ENABLE); 
+  RCC_APB1PeriphClockCmd(EVAL_COM2_CLK, ENABLE); 
 
 
   /* Configure USART Tx as alternate function push-pull */
   GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;
-  GPIO_InitStructure.GPIO_Pin = EVAL_COM1_TX_PIN;
+  GPIO_InitStructure.GPIO_Pin = EVAL_COM2_TX_PIN;
   GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-  GPIO_Init(EVAL_COM1_TX_GPIO_PORT, &GPIO_InitStructure);
-
+  GPIO_Init(EVAL_COM2_TX_GPIO_PORT, &GPIO_InitStructure);
+ 
   /* Configure USART Rx as input floating */
   GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;
-  GPIO_InitStructure.GPIO_Pin = EVAL_COM1_RX_PIN;
-  GPIO_Init(EVAL_COM1_RX_GPIO_PORT, &GPIO_InitStructure);
+  GPIO_InitStructure.GPIO_Pin = EVAL_COM2_RX_PIN;
+  GPIO_Init(EVAL_COM2_RX_GPIO_PORT, &GPIO_InitStructure);
 
   /* USART configuration */
-  USART_Init(EVAL_COM1, USART_InitStruct);
+  USART_Init(EVAL_COM2, USART_InitStruct);
     
   /* Enable USART */
-  USART_Cmd(EVAL_COM1, ENABLE);
+  USART_Cmd(EVAL_COM2, ENABLE);
 }
 
 
@@ -112,6 +112,7 @@ void Int2Str(uint8_t* str, int32_t intnum)
 			Status++;
 		}
 	}
+	str[j] = '\0';
 }
 
 /**
@@ -244,9 +245,9 @@ uint32_t GetIntegerInput(int32_t * num)
 uint32_t SerialKeyPressed(uint8_t *key)
 {
 
-	if ( USART_GetFlagStatus(EVAL_COM1, USART_FLAG_RXNE) != RESET)
+	if ( USART_GetFlagStatus(EVAL_COM2, USART_FLAG_RXNE) != RESET)
 	{
-		*key = (uint8_t)EVAL_COM1->DR;
+		*key = (uint8_t)EVAL_COM2->DR;
 		return 1;
 	}
 	else
@@ -279,8 +280,8 @@ uint8_t GetKey(void)
   */
 void SerialPutChar(uint8_t c)
 {
-	USART_SendData(EVAL_COM1, c);
-	while (USART_GetFlagStatus(EVAL_COM1, USART_FLAG_TXE) == RESET)
+	USART_SendData(EVAL_COM2, c);
+	while (USART_GetFlagStatus(EVAL_COM2, USART_FLAG_TXE) == RESET)
 	{
 	}
 }
@@ -310,21 +311,25 @@ void GetInputString (uint8_t * buffP)
 {
 	uint32_t bytes_read = 0;
 	uint8_t c = 0;
+	uint8_t str[10] = {0};
 	do
 	{
 		//SerialPutChar('a');
 		c = GetKey();
-		if (c == '\n')
+		/* Note: Windows is \r\n */
+		if (c == '\n' | c == '\r')
 		{
 			//SerialPutChar('n');
 			if(buffP[bytes_read-1] == '\r')
 				break;
 		}
-		
-		if (c == '\b') /* Backspace */
+
+		/* Note: \b = 8, but DEL valuse is 127 */
+		if (c == '\b' || c == 127) /* Backspace */
 		{
 			if (bytes_read > 0)
 			{
+				SerialPutChar(127);
 				//SerialPutString("\b \b");
 				bytes_read --;
 			}
@@ -339,12 +344,13 @@ void GetInputString (uint8_t * buffP)
 		if ((c >= 0x20 && c <= 0x7E) || c == '\r')
 		{
 			buffP[bytes_read++] = c;
-			//SerialPutChar(c);
+			SerialPutChar(c);
 		}
 	}
 	while (1);
 	SerialPutString(("\r\n"));
 	buffP[bytes_read-1] = '\0';
+	//SerialPutString(buffP);
 }
 
 
