@@ -311,7 +311,6 @@ void GetInputString (uint8_t * buffP)
 {
 	uint32_t bytes_read = 0;
 	uint8_t c = 0;
-	uint8_t str[10] = {0};
 	do
 	{
 		//SerialPutChar('a');
