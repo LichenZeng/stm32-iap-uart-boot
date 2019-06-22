@@ -58,3 +58,7 @@ dkms.conf
 
 # Keil Project
 
+OUTPUT
+IAP-UART.uvguix.*
+IAP-UART.uvoptx
+*.orig
