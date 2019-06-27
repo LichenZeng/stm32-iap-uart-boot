@@ -65,6 +65,79 @@ static void FLASH_DisableWriteProtectionPages(void)
     }
 }
 
+/**
+ * @brief  Reset the mcu by software
+ * @param  none
+ * @note   use the 3.5 version of the firmware library.
+ */
+void SoftReset(void)
+{
+    __set_FAULTMASK(1); // Disable all irq
+    NVIC_SystemReset(); // Reset
+}
+
+void EXTI_Configuration(void)
+{
+    EXTI_InitTypeDef t_EXTI_InitStructure;
+    NVIC_InitTypeDef NVIC_InitStructure;
+
+    // PA1 IRQ
+    GPIO_EXTILineConfig(GPIO_PortSourceGPIOA, GPIO_PinSource1);
+    t_EXTI_InitStructure.EXTI_Line = EXTI_Line1;
+    t_EXTI_InitStructure.EXTI_Mode = EXTI_Mode_Interrupt;
+    t_EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Rising_Falling;
+    t_EXTI_InitStructure.EXTI_LineCmd = ENABLE;
+    EXTI_Init(&t_EXTI_InitStructure);
+
+    NVIC_InitStructure.NVIC_IRQChannel = EXTI1_IRQn;
+    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 1;
+    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 2;
+    NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+    NVIC_Init(&NVIC_InitStructure);
+}
+
+void EXTI1_IRQHandler(void)
+{
+    if(EXTI_GetITStatus(EXTI_Line1) != RESET)
+    {
+        EXTI_ClearITPendingBit(EXTI_Line1);
+        SerialPutString("\r\nIRQ1 trigger\r\n");
+        SoftReset();
+    }
+}
+
+void GPIO_Configuration(void)
+{
+    GPIO_InitTypeDef GPIO_InitStructure;
+
+    // PA0: MCU_GPIO0
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0;
+    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
+    GPIO_Init(GPIOA, &GPIO_InitStructure);
+    // PA1: MCU_GPIO1
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_1;
+    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU;
+    GPIO_Init(GPIOA, &GPIO_InitStructure);
+}
+
+// When Soc GPIO33 output 0(default 0), then MCU GPIO01 get value 1
+// When MCU GPIO01 get value 0, then forced fireware update
+uint8_t GPIO_Get_GPIO1_Status(void)
+{
+    uint8_t gpio_status  = GPIO_ReadInputDataBit(GPIOA, GPIO_Pin_1);
+    return gpio_status;
+}
+
+void GPIO_Set_GPIO0_Status(uint8_t val)
+{
+    if(!!val) {
+        GPIO_SetBits(GPIOA, GPIO_Pin_0);
+    } else {
+        GPIO_ResetBits(GPIOA, GPIO_Pin_0);
+    }
+}
 
 /************************************************************************/
 void IAP_WriteFlag(uint16_t flag)
@@ -86,7 +159,11 @@ uint16_t IAP_ReadFlag(void)
 #if (USE_BKP_SAVE_FLAG == 1)
     return BKP_ReadBackupRegister(IAP_FLAG_ADDR);
 #else
-    return STMFLASH_ReadHalfWord(IAP_FLAG_ADDR);
+    if(GPIO_Get_GPIO1_Status() == 1) {
+        return STMFLASH_ReadHalfWord(IAP_FLAG_ADDR);
+    } else {
+        return UPDATE_FLAG_DATA;
+    }
 #endif
 }
 
@@ -109,6 +186,8 @@ void IAP_USART_Init(void)
 void IAP_Init(void)
 {
     IAP_USART_Init();
+    GPIO_Configuration();
+    EXTI_Configuration();
 #if (USE_BKP_SAVE_FLAG == 1)
     RCC_APB1PeriphClockCmd(RCC_APB1ENR_PWREN | RCC_APB1ENR_BKPEN, ENABLE);
 #endif
@@ -118,7 +197,7 @@ int8_t IAP_RunApp(void)
 {
     if (((*(__IO uint32_t*)ApplicationAddress) & 0x2FFE0000 ) == 0x20000000)
     {
-        SerialPutString("\r\n Run to app.\r\n");
+        SerialPutString("\r\nBootloader: Run to app.\r\n\r\n");
         JumpAddress = *(__IO uint32_t*) (ApplicationAddress + 4);
         Jump_To_Application = (pFunction) JumpAddress;
         __set_MSP(*(__IO uint32_t*) ApplicationAddress);
@@ -127,7 +206,7 @@ int8_t IAP_RunApp(void)
     }
     else
     {
-        SerialPutString("\r\n Run to app error.\r\n");
+        SerialPutString("\r\nBootloader: Run to app error.\r\n");
         return -1;
     }
 }
@@ -164,7 +243,7 @@ void IAP_Main_Menu(void)
     {
         SerialPutString("\r\n IAP Main Menu (V 0.2.0)\r\n");
         SerialPutString(" update\r\n");
-        SerialPutString(" upload\r\n");
+        //SerialPutString(" upload\r\n");
         SerialPutString(" erase\r\n");
         SerialPutString(" menu\r\n");
         SerialPutString(" runapp\r\n");
