@@ -62,28 +62,28 @@ void STM_EVAL_COMInit(USART_InitTypeDef* USART_InitStruct)
     GPIO_InitTypeDef GPIO_InitStructure;
 
     /* Enable GPIO clock */
-    RCC_APB2PeriphClockCmd(EVAL_COM2_TX_GPIO_CLK | EVAL_COM2_RX_GPIO_CLK | RCC_APB2Periph_AFIO, ENABLE);
+    RCC_APB2PeriphClockCmd(EVAL_COM1_TX_GPIO_CLK | EVAL_COM1_RX_GPIO_CLK | EVAL_COM1_CLK | RCC_APB2Periph_AFIO, ENABLE);
 
     /* Enable UART clock */
-    RCC_APB1PeriphClockCmd(EVAL_COM2_CLK, ENABLE);
+    //RCC_APB1PeriphClockCmd(EVAL_COM1_CLK, ENABLE);
 
 
     /* Configure USART Tx as alternate function push-pull */
     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;
-    GPIO_InitStructure.GPIO_Pin = EVAL_COM2_TX_PIN;
+    GPIO_InitStructure.GPIO_Pin = EVAL_COM1_TX_PIN;
     GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-    GPIO_Init(EVAL_COM2_TX_GPIO_PORT, &GPIO_InitStructure);
+    GPIO_Init(EVAL_COM1_TX_GPIO_PORT, &GPIO_InitStructure);
 
     /* Configure USART Rx as input floating */
     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;
-    GPIO_InitStructure.GPIO_Pin = EVAL_COM2_RX_PIN;
-    GPIO_Init(EVAL_COM2_RX_GPIO_PORT, &GPIO_InitStructure);
+    GPIO_InitStructure.GPIO_Pin = EVAL_COM1_RX_PIN;
+    GPIO_Init(EVAL_COM1_RX_GPIO_PORT, &GPIO_InitStructure);
 
     /* USART configuration */
-    USART_Init(EVAL_COM2, USART_InitStruct);
+    USART_Init(EVAL_COM1, USART_InitStruct);
 
     /* Enable USART */
-    USART_Cmd(EVAL_COM2, ENABLE);
+    USART_Cmd(EVAL_COM1, ENABLE);
 }
 
 
@@ -245,9 +245,9 @@ uint32_t GetIntegerInput(int32_t * num)
 uint32_t SerialKeyPressed(uint8_t *key)
 {
 
-    if ( USART_GetFlagStatus(EVAL_COM2, USART_FLAG_RXNE) != RESET)
+    if ( USART_GetFlagStatus(EVAL_COM1, USART_FLAG_RXNE) != RESET)
     {
-        *key = (uint8_t)EVAL_COM2->DR;
+        *key = (uint8_t)EVAL_COM1->DR;
         return 1;
     }
     else
@@ -273,6 +273,23 @@ uint8_t GetKey(void)
 
 }
 
+void Delay(unsigned int loop)
+{
+    while(loop--);
+}
+
+void GPIO_Set_PA0_Status(int val)
+{
+    if(!!val) {
+        GPIO_SetBits(GPIOA, GPIO_Pin_0);
+        Delay(0xfff);
+    } else {
+        //Delay(0xffff);
+        GPIO_ResetBits(GPIOA, GPIO_Pin_0);
+        Delay(0xfff);
+    }
+}
+
 /**
   * @brief  Print a character on the HyperTerminal
   * @param  c: The character to be printed
@@ -280,10 +297,12 @@ uint8_t GetKey(void)
   */
 void SerialPutChar(uint8_t c)
 {
-    USART_SendData(EVAL_COM2, c);
-    while (USART_GetFlagStatus(EVAL_COM2, USART_FLAG_TXE) == RESET)
+    GPIO_Set_PA0_Status(1);
+    USART_SendData(EVAL_COM1, c);
+    while (USART_GetFlagStatus(EVAL_COM1, USART_FLAG_TXE) == RESET)
     {
     }
+    GPIO_Set_PA0_Status(0);
 }
 
 /**

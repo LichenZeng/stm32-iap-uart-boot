@@ -115,6 +115,7 @@ void GPIO_Configuration(void)
     GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
     GPIO_Init(GPIOA, &GPIO_InitStructure);
+    GPIO_SetBits(GPIOA, GPIO_Pin_0);
     // PA1: MCU_GPIO1
     GPIO_InitStructure.GPIO_Pin = GPIO_Pin_1;
     GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
@@ -157,7 +158,11 @@ void IAP_WriteFlag(uint16_t flag)
 uint16_t IAP_ReadFlag(void)
 {
 #if (USE_BKP_SAVE_FLAG == 1)
-    return BKP_ReadBackupRegister(IAP_FLAG_ADDR);
+    if(GPIO_Get_GPIO1_Status() == 1) {
+        return BKP_ReadBackupRegister(IAP_FLAG_ADDR);
+    } else {
+        return UPDATE_FLAG_DATA;
+    }
 #else
     if(GPIO_Get_GPIO1_Status() == 1) {
         return STMFLASH_ReadHalfWord(IAP_FLAG_ADDR);
